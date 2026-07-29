@@ -3,9 +3,7 @@ from pathlib import Path
 import streamlit as st
 import numpy as np
 from PIL import Image
-import tensorflow as tf
-from tensorflow.keras.applications import EfficientNetB0
-from tensorflow.keras import layers, models
+import onnxruntime as ort
 import plotly.graph_objects as go
 
 # -----------------------------
@@ -13,7 +11,7 @@ import plotly.graph_objects as go
 # -----------------------------
 BASE_DIR = Path(__file__).resolve().parent
 ICON_PATH = str(BASE_DIR / "gemini-svg.svg")
-MODEL_PATH = str(BASE_DIR / "models" / "best_model.keras")
+MODEL_PATH = str(BASE_DIR / "models" / "best_model.onnx")
 
 # -----------------------------
 # 2. Page Configuration
@@ -52,33 +50,20 @@ with st.sidebar:
     
     st.markdown("---")
     st.markdown("### 📋 System Info")
-    st.caption("• **Model:** EfficientNet Deep Learning")
+    st.caption("• **Engine:** ONNX Runtime Engine")
     st.caption("• **Target Classes:** Glioma, Meningioma, Pituitary, No Tumor")
 
 # -----------------------------
-# 4. Model Loading via Weights
+# 4. Model Loading (ONNX)
 # -----------------------------
 @st.cache_resource
 def load_my_model():
-    # 1. First attempt direct loading
-    try:
-        return tf.keras.models.load_model(MODEL_PATH, compile=False)
-    except Exception:
-        pass
+    session = ort.InferenceSession(MODEL_PATH, providers=['CPUExecutionProvider'])
+    return session
 
-    # 2. Robust Fallback: Build EfficientNetB0 architecture and load weights
-    base_model = EfficientNetB0(weights=None, include_top=False, input_shape=(224, 224, 3))
-    x = layers.GlobalAveragePooling2D()(base_model.output)
-    x = layers.Dropout(0.2)(x)
-    outputs = layers.Dense(4, activation="softmax")(x)
-    
-    model = models.Model(inputs=base_model.input, outputs=outputs)
-    
-    # Load weights directly from the .keras artifact
-    model.load_weights(MODEL_PATH)
-    return model
-
-model = load_my_model()
+session = load_my_model()
+input_name = session.get_inputs()[0].name
+output_name = session.get_outputs()[0].name
 
 class_names = [
     "Glioma",
@@ -86,6 +71,16 @@ class_names = [
     "No Tumor",
     "Pituitary"
 ]
+
+def preprocess_mri(img_pil):
+    img = img_pil.resize((224, 224))
+    img_arr = np.array(img, dtype=np.float32)
+    img_arr = np.expand_dims(img_arr, axis=0)
+    return img_arr
+
+def softmax(x):
+    e_x = np.exp(x - np.max(x, axis=-1, keepdims=True))
+    return e_x / e_x.sum(axis=-1, keepdims=True)
 
 # -----------------------------
 # 5. Main Interface
@@ -98,16 +93,17 @@ st.markdown("---")
 if uploaded_file is not None:
     # Preprocess image
     image = Image.open(uploaded_file).convert("RGB")
-    img = image.resize((224, 224))
-    img_array = tf.keras.utils.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array = tf.keras.applications.efficientnet.preprocess_input(img_array)
+    input_data = preprocess_mri(image)
 
-    # Prediction
-    prediction = model.predict(img_array, verbose=0)[0]
-    predicted_index = np.argmax(prediction)
+    # ONNX Inference
+    raw_output = session.run([output_name], {input_name: input_data})[0][0]
+    
+    # Softmax normalization check
+    prediction = softmax(raw_output) if (np.max(raw_output) > 1.0 or np.min(raw_output) < 0.0) else raw_output
+    
+    predicted_index = int(np.argmax(prediction))
     predicted_class = class_names[predicted_index]
-    confidence = prediction[predicted_index] * 100
+    confidence = float(prediction[predicted_index] * 100)
 
     # -----------------------------
     # 2-Column Dashboard Layout
