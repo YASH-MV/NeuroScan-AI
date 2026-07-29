@@ -4,33 +4,19 @@ import streamlit as st
 import numpy as np
 from PIL import Image
 import tensorflow as tf
-import keras
-from keras.initializers import VarianceScaling
-from keras.utils import img_to_array
-from keras.applications.efficientnet import preprocess_input
+from tensorflow.keras.applications import EfficientNetB0
+from tensorflow.keras import layers, models
 import plotly.graph_objects as go
 
 # -----------------------------
-# 1. Custom Initializer for Keras 3 Deserialization
-# -----------------------------
-class SafeVarianceScaling(VarianceScaling):
-    """
-    Strips the legacy 'input_axes' argument saved in older/mixed Keras configs
-    so native Keras 3 can deserialize the model without throwing TypeError.
-    """
-    def __init__(self, *args, **kwargs):
-        kwargs.pop("input_axes", None)
-        super().__init__(*args, **kwargs)
-
-# -----------------------------
-# 2. Path Definition (Relative)
+# 1. Path Definition (Relative)
 # -----------------------------
 BASE_DIR = Path(__file__).resolve().parent
 ICON_PATH = str(BASE_DIR / "gemini-svg.svg")
 MODEL_PATH = str(BASE_DIR / "models" / "best_model.keras")
 
 # -----------------------------
-# 3. Page Configuration
+# 2. Page Configuration
 # -----------------------------
 st.set_page_config(
     page_title="NeuroScan AI - Brain Tumor Detection",
@@ -48,7 +34,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------
-# 4. Sidebar Setup
+# 3. Sidebar Setup
 # -----------------------------
 with st.sidebar:
     if os.path.exists(ICON_PATH):
@@ -70,18 +56,27 @@ with st.sidebar:
     st.caption("• **Target Classes:** Glioma, Meningioma, Pituitary, No Tumor")
 
 # -----------------------------
-# 5. Model Loading & Classes
+# 4. Model Loading via Weights
 # -----------------------------
 @st.cache_resource
 def load_my_model():
-    custom_objects = {
-        "VarianceScaling": SafeVarianceScaling
-    }
-    return keras.models.load_model(
-        MODEL_PATH, 
-        custom_objects=custom_objects, 
-        compile=False
-    )
+    # 1. First attempt direct loading
+    try:
+        return tf.keras.models.load_model(MODEL_PATH, compile=False)
+    except Exception:
+        pass
+
+    # 2. Robust Fallback: Build EfficientNetB0 architecture and load weights
+    base_model = EfficientNetB0(weights=None, include_top=False, input_shape=(224, 224, 3))
+    x = layers.GlobalAveragePooling2D()(base_model.output)
+    x = layers.Dropout(0.2)(x)
+    outputs = layers.Dense(4, activation="softmax")(x)
+    
+    model = models.Model(inputs=base_model.input, outputs=outputs)
+    
+    # Load weights directly from the .keras artifact
+    model.load_weights(MODEL_PATH)
+    return model
 
 model = load_my_model()
 
@@ -93,7 +88,7 @@ class_names = [
 ]
 
 # -----------------------------
-# 6. Main Interface
+# 5. Main Interface
 # -----------------------------
 st.title("Brain Tumor Detection Dashboard")
 st.write("Upload an MRI scan in the sidebar to view deep learning classification results.")
@@ -104,9 +99,9 @@ if uploaded_file is not None:
     # Preprocess image
     image = Image.open(uploaded_file).convert("RGB")
     img = image.resize((224, 224))
-    img_array = img_to_array(img)
+    img_array = tf.keras.utils.img_to_array(img)
     img_array = np.expand_dims(img_array, axis=0)
-    img_array = preprocess_input(img_array)
+    img_array = tf.keras.applications.efficientnet.preprocess_input(img_array)
 
     # Prediction
     prediction = model.predict(img_array, verbose=0)[0]
@@ -174,5 +169,4 @@ if uploaded_file is not None:
     )
 
 else:
-    # Initial empty state prompt
     st.info("👈 Please select and upload an MRI scan from the sidebar to begin analysis.")
