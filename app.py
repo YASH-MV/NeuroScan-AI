@@ -1,29 +1,40 @@
-import os
-# Force TensorFlow to use legacy Keras 2 behavior before importing TF/Keras
-os.environ["TF_USE_LEGACY_KERAS"] = "1"
-
 from pathlib import Path
+import os
 import streamlit as st
 import numpy as np
 from PIL import Image
 import tensorflow as tf
+import keras
+from keras.initializers import VarianceScaling
 from keras.utils import img_to_array
 from keras.applications.efficientnet import preprocess_input
 import plotly.graph_objects as go
 
 # -----------------------------
-# 1. Path Definition (Relative)
+# 1. Custom Initializer for Keras 3 Compatibility
+# -----------------------------
+class SafeVarianceScaling(VarianceScaling):
+    """
+    Strips legacy 'input_axes' arguments saved in older/mixed Keras configs
+    to allow smooth deserialization in Keras 3.
+    """
+    def __init__(self, *args, **kwargs):
+        kwargs.pop("input_axes", None)
+        super().__init__(*args, **kwargs)
+
+# -----------------------------
+# 2. Path Definition (Relative)
 # -----------------------------
 BASE_DIR = Path(__file__).resolve().parent
 ICON_PATH = str(BASE_DIR / "gemini-svg.svg")
 MODEL_PATH = str(BASE_DIR / "models" / "best_model.keras")
 
 # -----------------------------
-# 2. Page Configuration
+# 3. Page Configuration
 # -----------------------------
 st.set_page_config(
     page_title="NeuroScan AI - Brain Tumor Detection",
-    page_icon=ICON_PATH if os.path.exists(ICON_PATH) else "🧠",  # Fallback emoji if SVG fails
+    page_icon=ICON_PATH if os.path.exists(ICON_PATH) else "🧠",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -37,10 +48,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------
-# 3. Sidebar Setup
+# 4. Sidebar Setup
 # -----------------------------
 with st.sidebar:
-    # Display the custom SVG logo if available
     if os.path.exists(ICON_PATH):
         st.image(ICON_PATH, width=80)
     
@@ -60,16 +70,18 @@ with st.sidebar:
     st.caption("• **Target Classes:** Glioma, Meningioma, Pituitary, No Tumor")
 
 # -----------------------------
-# 4. Model & Classes
+# 5. Model Loading & Classes
 # -----------------------------
 @st.cache_resource
 def load_my_model():
-    # Try loading with tf_keras (legacy Keras 2 loader) first, fall back to tf.keras
-    try:
-        import tf_keras as legacy_keras
-        return legacy_keras.models.load_model(MODEL_PATH, compile=False)
-    except ImportError:
-        return tf.keras.models.load_model(MODEL_PATH, compile=False)
+    custom_objects = {
+        "VarianceScaling": SafeVarianceScaling
+    }
+    return keras.models.load_model(
+        MODEL_PATH, 
+        custom_objects=custom_objects, 
+        compile=False
+    )
 
 model = load_my_model()
 
@@ -81,7 +93,7 @@ class_names = [
 ]
 
 # -----------------------------
-# 5. Main Interface
+# 6. Main Interface
 # -----------------------------
 st.title("Brain Tumor Detection Dashboard")
 st.write("Upload an MRI scan in the sidebar to view deep learning classification results.")
