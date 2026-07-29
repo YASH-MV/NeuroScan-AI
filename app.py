@@ -1,10 +1,12 @@
 import os
+# Force TensorFlow to use legacy Keras 2 behavior before importing TF/Keras
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
+
 from pathlib import Path
 import streamlit as st
 import numpy as np
 from PIL import Image
 import tensorflow as tf
-from keras.models import load_model
 from keras.utils import img_to_array
 from keras.applications.efficientnet import preprocess_input
 import plotly.graph_objects as go
@@ -62,7 +64,12 @@ with st.sidebar:
 # -----------------------------
 @st.cache_resource
 def load_my_model():
-    return tf.keras.models.load_model(MODEL_PATH, compile=False)
+    # Try loading with tf_keras (legacy Keras 2 loader) first, fall back to tf.keras
+    try:
+        import tf_keras as legacy_keras
+        return legacy_keras.models.load_model(MODEL_PATH, compile=False)
+    except ImportError:
+        return tf.keras.models.load_model(MODEL_PATH, compile=False)
 
 model = load_my_model()
 
