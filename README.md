@@ -44,8 +44,8 @@ Make sure you have **Python 3.10+** installed on your system.
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/your-username/Brain-Tumor-Detection.git](https://github.com/your-username/Brain-Tumor-Detection.git)
-cd Brain-Tumor-Detection
+git clone [https://github.com/YASH-MV/NeuroScan-AI.git](https://github.com/YASH-MV/NeuroScan-AI.git)
+cd NeuroScan-AI
 2. Create & Activate a Virtual Environment
 Windows (PowerShell):
 
