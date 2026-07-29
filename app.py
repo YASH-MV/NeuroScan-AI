@@ -1,5 +1,5 @@
-from pathlib import Path
 import os
+from pathlib import Path
 import streamlit as st
 import numpy as np
 from PIL import Image
@@ -11,12 +11,12 @@ from keras.applications.efficientnet import preprocess_input
 import plotly.graph_objects as go
 
 # -----------------------------
-# 1. Custom Initializer for Keras 3 Compatibility
+# 1. Custom Initializer for Keras 3 Deserialization
 # -----------------------------
 class SafeVarianceScaling(VarianceScaling):
     """
-    Strips legacy 'input_axes' arguments saved in older/mixed Keras configs
-    to allow smooth deserialization in Keras 3.
+    Strips the legacy 'input_axes' argument saved in older/mixed Keras configs
+    so native Keras 3 can deserialize the model without throwing TypeError.
     """
     def __init__(self, *args, **kwargs):
         kwargs.pop("input_axes", None)
