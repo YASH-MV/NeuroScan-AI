@@ -62,7 +62,7 @@ with st.sidebar:
 # -----------------------------
 @st.cache_resource
 def load_my_model():
-    return load_model(MODEL_PATH)
+    return load_model(MODEL_PATH, compile=False)
 
 model = load_my_model()
 
