@@ -1,3 +1,5 @@
+import os
+from pathlib import Path
 import streamlit as st
 import numpy as np
 from PIL import Image
@@ -8,16 +10,18 @@ from keras.applications.efficientnet import preprocess_input
 import plotly.graph_objects as go
 
 # -----------------------------
-# 1. Path Definition
+# 1. Path Definition (Relative)
 # -----------------------------
-ICON_PATH = r"C:\DL\Brain-Tumor-Detection\gemini-svg.svg"
+BASE_DIR = Path(__file__).resolve().parent
+ICON_PATH = str(BASE_DIR / "gemini-svg.svg")
+MODEL_PATH = str(BASE_DIR / "models" / "best_model.keras")
 
 # -----------------------------
 # 2. Page Configuration
 # -----------------------------
 st.set_page_config(
     page_title="NeuroScan AI - Brain Tumor Detection",
-    page_icon=ICON_PATH,  # Sets browser tab icon
+    page_icon=ICON_PATH if os.path.exists(ICON_PATH) else "🧠",  # Fallback emoji if SVG fails
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -34,8 +38,9 @@ st.markdown("""
 # 3. Sidebar Setup
 # -----------------------------
 with st.sidebar:
-    # Display the custom SVG logo
-    st.image(ICON_PATH, width=80)
+    # Display the custom SVG logo if available
+    if os.path.exists(ICON_PATH):
+        st.image(ICON_PATH, width=80)
     
     st.title("NeuroScan AI")
     st.caption("Brain Tumor Diagnostic Platform")
@@ -57,7 +62,7 @@ with st.sidebar:
 # -----------------------------
 @st.cache_resource
 def load_my_model():
-    return load_model("models/best_model.keras")
+    return load_model(MODEL_PATH)
 
 model = load_my_model()
 
