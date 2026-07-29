@@ -1,3 +1,4 @@
+[![Open in Streamlit](https://img.shields.io/badge/Open%20in-Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)](https://neuroscan-ai-s6h4c4rtjfxgsdyp9gmgff.streamlit.app/)
 # 🧠 NeuroScan AI — Brain Tumor Detection Dashboard
 
 <p align="center">
